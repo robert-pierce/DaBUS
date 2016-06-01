@@ -11,12 +11,13 @@
    "srl"  "I-Type",
    "and"  "R-Type",
    "or"   "R-Type",
-   "lw"   "I-Type",
-   "sw"   "I-Type",
+   "lw"   "LD-Type",
+   "sw"   "LD-Type",
    "j"    "J-Type",
    "jr"   "JR-Type",
    "jal"  "J-Type",
-   "beq"  "I-Type"})
+   "beq"  "I-Type",
+   "halt" "O-Type"})
 
 (def opcodes
   {"add"  "000001",
@@ -31,7 +32,8 @@
    "j"    "001010",
    "jr"   "001011",
    "jal"  "001100",
-   "beq"  "001101"})
+   "beq"  "001101",
+   "halt" "001110"})
 
 (def registers
   {"$0"    "00000",
@@ -66,15 +68,15 @@
    "$14"   "01110",
    "$t7"   "01111",
    "$15"   "01111",
-   "$s0"    "10000",
+   "$s0"   "10000",
    "$16"   "10000",
    "$s1"   "10001",
    "$17"   "10001",
-   "$s2"    "10010",
+   "$s2"   "10010",
    "$18"   "10010",
    "$s3"   "10011",
    "$19"   "10011",
-   "$s4"    "10100",
+   "$s4"   "10100",
    "$20"   "10100",
    "$s5"   "10101",
    "$21"   "10101",
@@ -84,7 +86,7 @@
    "$23"   "10111",
    "$t8"   "11000",
    "$24"   "11000",
-   "$t9"    "11001",
+   "$t9"   "11001",
    "$25"   "11001",
    "$k0"   "11010",
    "$26"   "11010",
@@ -126,6 +128,25 @@
   (pad-binary-zeros (Integer/toBinaryString (read-string hex-in)) 
                     desired-length))
 
+(defn parse-load-arg
+  "Parse the special arg format for load instruction:  offset($reg)
+  Returns a vec [Offset register] where both are strings and regsiter 
+  is in 5 bit binary"
+  [arg-str-in]
+  (let [arg-vec (str/split arg-str-in #"[()]")]
+    (assoc arg-vec 1 (get registers (last arg-vec)))))
+
+(defn init-program
+  "This function writes instructions or text to the out-file that must
+  be included in order for the program to function properly."
+  [file-out]
+  (do 
+    ; add "v2.0 raw" b/c it is required for logisim to load an image into ram
+    (spit file-out "v2.0 raw\n" :append true)
+    ; set $sp to address 10,000, for this project this will be the top of the stack
+    ; addi $sp $zero 10,000
+    (spit file-out "081d2710\n" :append true)))
+
 (defn process-r-type
   "Processes an R-Type instruction"
   [instruction-map file-out]
@@ -134,18 +155,17 @@
         Rb (get registers (get instruction-map :arg2))
         Rc (get registers(get instruction-map :arg3))]
     (do
-      ;; (println (str  (get instruction-map :op) " " 
-                     ;; (get instruction-map :arg1) " " 
-                     ;; (get instruction-map :arg2) " " 
-                     ;; (get instruction-map :arg3)))
+      (println (str  (get instruction-map :op) " " 
+                     (get instruction-map :arg1) " " 
+                     (get instruction-map :arg2) " " 
+                     (get instruction-map :arg3)))
 
-     ;; (println (str "Opcode: " opcode 
-                   ;; " Rb " Rb 
-                   ;; " Rc " Rc 
-                   ;; " Rd " Rd))
+     (println (str "Opcode: " opcode 
+                   " Rb " Rb 
+                   " Rc " Rc 
+                   " Rd " Rd))
 
-     ;; (println 
-      ;; (bin-str-to-hex (str opcode Rb Rc Rd "00000000000")))
+     (println (bin-str-to-hex (str opcode Rb Rc Rd "00000000000")))
 
      (spit file-out 
            (str (bin-str-to-hex (str opcode Rb Rc Rd "00000000000")) "\n")
@@ -160,20 +180,20 @@
         Imm (get instruction-map :arg3)]
     
     (do
-      ;; (println 
-       ;; (str  (get instruction-map :op) " " 
-             ;; (get instruction-map :arg1) " " 
-             ;; (get instruction-map :arg2) " " 
-             ;; (get instruction-map :arg3)))
+      (println 
+       (str  (get instruction-map :op) " " 
+             (get instruction-map :arg1) " " 
+             (get instruction-map :arg2) " " 
+             (get instruction-map :arg3)))
 
-      ;; (println (str "Opcode: " opcode
-                    ;; " Rb: " Rb 
-                    ;; " Rd: " Rd
-                    ;; " Imm: " Imm))
+      (println (str "Opcode: " opcode
+                    " Rb: " Rb 
+                    " Rd: " Rd
+                    " Imm: " Imm))
 
-      ;; (println (str (bin-str-to-hex 
-                     ;; (str opcode Rb Rd))
-                    ;; (int-to-hex Imm)))
+      (println (str (bin-str-to-hex 
+                     (str opcode Rb Rd))
+                    (int-to-hex Imm)))
 
       (spit file-out
             (str (bin-str-to-hex 
@@ -182,53 +202,97 @@
             :append true))))
 
 (defn process-j-type
-  "Processes an J-Type instructin"
+  "Processes an J-Type instruction"
   [instruction-map file-out]
   (let [opcode (get opcodes (get instruction-map :op))
         Target (get instruction-map :arg1)]
 
     (do 
-      ;; (println 
-       ;; (str (get instruction-map :op) " "
-            ;; (get instruction-map :arg1)))
+      (println 
+       (str (get instruction-map :op) " "
+            (get instruction-map :arg1)))
 
-      ;; (println (str "Opcode: " opcode
-                    ;; " Target " Target))
+      (println (str "Opcode: " opcode
+                    " Target " Target))
 
-      ;; (println (str (bin-str-to-hex (str opcode 
-                                         ;; (hex-target-to-binary Target 26)))))
+      (println (str (bin-str-to-hex (str opcode 
+                                         (hex-target-to-binary Target 26)))))
 
       (spit file-out
             (str (bin-str-to-hex (str opcode 
                                       (hex-target-to-binary Target 26))) "\n")
             :append true))))
 
+(defn process-o-type
+  "Process an O-Type instruction"
+  [instruction-map file-out]
+  (let [opcode (get opcodes (get instruction-map :op))]
+    (do
+      (println (str (get instruction-map :op)))
+      
+      (println (str "Opcode: " opcode))
+
+      (println (str (bin-str-to-hex (str opcode "00000000000000000000000000"))))
+
+      (spit file-out
+            (str (bin-str-to-hex (str opcode "00000000000000000000000000")) "\n")
+            :append true))))
+
 (defn process-jr-type
  "Process the special case of the jal instruction"
  [instruction-map file-out]
  (let [opcode (get opcodes (get instruction-map :op))
-       Rb (get registers (get instruction-map :arg2))]
+       Rb (get registers (get instruction-map :arg1))]
    (do
-     ;; (println 
-       ;; (str  (get instruction-map :op) " " 
-             ;; (get instruction-map :arg2)))
+     (println 
+       (str  (get instruction-map :op) " " 
+             (get instruction-map :arg1)))
 
-     ;; (println (str "Opcode: " opcode 
-                   ;; " Rb " Rb))
+     (println (str "Opcode: " opcode 
+                   " Rb " Rb))
 
-     ;; (println (bin-str-to-hex 
-                ;; (str opcode Rb "00000" "0000000000000000")))
+     (println (bin-str-to-hex 
+                (str opcode Rb "00000" "0000000000000000")))
 
      (spit file-out 
            (str (bin-str-to-hex (str opcode Rb "00000" "0000000000000000")) "\n")
            :append true))))
+
+(defn process-load-type
+  "Process the special case of load types with syntax off($reg)"
+  [instruction-map file-out]
+  (let [opcode (get opcodes (get instruction-map :op))
+        Rd (get registers (get instruction-map :arg1))
+        [Offset Rb] (parse-load-arg (get instruction-map :arg2))]
+    
+    (do
+      (println 
+       (str  (get instruction-map :op) " " 
+             (get instruction-map :arg1) " "
+             (get instruction-map :arg2)))
+
+      (println (str "Opcode: " opcode 
+                   " Rb " Rb
+                   " Rd " Rd
+                   " Offset " Offset))
+
+      (println (str (bin-str-to-hex 
+                     (str opcode Rb Rd))
+                    (int-to-hex Offset)))
+      
+      (spit file-out
+            (str (bin-str-to-hex 
+                  (str opcode Rb Rd))
+                 (int-to-hex Offset) "\n")
+            :append true))))
 
 (defn -main
   "This is an assembler for cs-2200 project) 1"
   [file-in file-out]
   (with-open [rdr (io/reader file-in)]
     (do
-      (spit file-out "v2.0 raw\n" :append true)
+      (init-program file-out)
+
       (doseq [line (line-seq rdr)]
         (let [inst-map 
               (zipmap [:op :arg1 :arg2 :arg3] 
@@ -242,4 +306,8 @@
                   (if (= instruction-type "J-Type")
                     (process-j-type inst-map file-out)
                     (if (= instruction-type "JR-Type")
-                      (process-jr-type inst-map file-out))))))))))))
+                      (process-jr-type inst-map file-out)
+                      (if (= instruction-type "LD-Type")
+                        (process-load-type inst-map file-out)
+                        (if (= instruction-type "O-Type")
+                          (process-o-type inst-map file-out))))))))))))))
