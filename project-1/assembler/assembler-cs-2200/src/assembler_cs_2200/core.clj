@@ -66,15 +66,15 @@
    "$14"   "01110",
    "$t7"   "01111",
    "$15"   "01111",
-   "s0"    "10000",
+   "$s0"    "10000",
    "$16"   "10000",
    "$s1"   "10001",
    "$17"   "10001",
-   "s2"    "10010",
+   "$s2"    "10010",
    "$18"   "10010",
    "$s3"   "10011",
    "$19"   "10011",
-   "s4"    "10100",
+   "$s4"    "10100",
    "$20"   "10100",
    "$s5"   "10101",
    "$21"   "10101",
@@ -84,7 +84,7 @@
    "$23"   "10111",
    "$t8"   "11000",
    "$24"   "11000",
-   "t9"    "11001",
+   "$t9"    "11001",
    "$25"   "11001",
    "$k0"   "11010",
    "$26"   "11010",
@@ -99,28 +99,77 @@
    "$ra"   "11111",
    "$31"   "11111"})
 
+
+(defn int-to-hex
+  "parses an integer into a 16 bit (4 digit) hex string"
+  [int-in]
+  (let [parsed-int (Integer/parseInt int-in)] 
+    (if (< parsed-int 0)
+      (apply str (drop 4 (format "%04x" parsed-int)))
+      (format "%04x" parsed-int))))
+
+(defn bin-str-to-hex
+  "parses a binary string into a hex string"
+  [bin-str-in]
+  (Integer/toString 
+   (Integer/parseInt bin-str-in 2) 16))
+
 (defn process-r-type
-  "Processes an R-Type instructin"
+  "Processes an R-Type instruction"
   [instruction-map file-out]
   (let [opcode (get opcodes (get instruction-map :op))
         Rd (get registers (get instruction-map :arg1))
         Rb (get registers (get instruction-map :arg2))
         Rc (get registers(get instruction-map :arg3))]
     (do
-      (println (str  (get instruction-map :op) " " (get instruction-map :arg1) " " (get instruction-map :arg2) " " (get instruction-map :arg3)))
-      (println (str "Opcode: " opcode " Rd " Rd " Rb " Rb " Rc " Rc))
-      (println (str opcode Rb Rc Rd "00000000000"))
-      (println (Integer/toHexString (Integer/parseInt (str opcode Rb Rc Rd "00000000000") 2)))
-      (spit file-out 
-            (Integer/toHexString (Integer/parseInt (str opcode Rb Rc Rd "00000000000") 2))
-            :append true))))
+     (println 
+      (str  (get instruction-map :op) " " 
+            (get instruction-map :arg1) " " 
+            (get instruction-map :arg2) " " 
+            (get instruction-map :arg3)))
+
+     (println (str "Opcode: " opcode 
+                   " Rb " Rb 
+                   " Rc " Rc 
+                   " Rd " Rd))
+
+     (println 
+      (bin-str-to-hex (str opcode Rb Rc Rd "00000000000")))
+
+     (spit file-out 
+           (bin-str-to-hex (str opcode Rb Rc Rd "00000000000"))
+           :append true))))
 
 (defn process-i-type
   "Processes an I-Type instructin"
   [instruction-map file-out]
-  (spit file-out
-        (str (get instruction-map :op) " is an I-Type instruction\n")
-        :append true))
+  (let [opcode (get opcodes (get instruction-map :op))
+        Rd (get registers (get instruction-map :arg1))
+        Rb (get registers (get instruction-map :arg2))
+        Imm (get instruction-map :arg3)]
+    
+    (do
+      (println 
+       (str  (get instruction-map :op) " " 
+             (get instruction-map :arg1) " " 
+             (get instruction-map :arg2) " " 
+             (get instruction-map :arg3)))
+
+      (println (str "Opcode: " opcode
+                    " Rb: " Rb 
+                    " Rd: " Rd
+                    " Imm: " Imm))
+
+      (println (str (bin-str-to-hex 
+                     (str opcode Rb Rd))
+                    (int-to-hex Imm)))
+
+      (spit file-out 
+            (str (bin-str-to-hex opcode)
+                 (bin-str-to-hex Rb)
+                 (bin-str-to-hex Rd)
+                 (int-to-hex Imm))
+            :append true))))
 
 (defn process-j-type
   "Processes an J-Type instructin"
