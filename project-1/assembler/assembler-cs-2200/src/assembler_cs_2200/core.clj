@@ -14,7 +14,7 @@
    "lw"   "I-Type",
    "sw"   "I-Type",
    "j"    "J-Type",
-   "jr"   "I-Type",
+   "jr"   "JR-Type",
    "jal"  "J-Type",
    "beq"  "I-Type"})
 
@@ -100,19 +100,31 @@
    "$31"   "11111"})
 
 
-(defn int-to-hex
-  "parses an integer into a 16 bit (4 digit) hex string"
-  [int-in]
-  (let [parsed-int (Integer/parseInt int-in)] 
-    (if (< parsed-int 0)
-      (apply str (drop 4 (format "%04x" parsed-int)))
-      (format "%04x" parsed-int))))
-
 (defn bin-str-to-hex
   "parses a binary string into a hex string"
   [bin-str-in]
   (Integer/toString 
    (Integer/parseInt bin-str-in 2) 16))
+
+(defn int-to-hex
+  "parses an integer into a 16 bit (4 digit) hex string"
+  [int-in]
+  (if (nil? int-in)
+    (str "0000")
+    (let [parsed-int (Integer/parseInt int-in)] 
+      (if (< parsed-int 0)
+        (apply str (drop 4 (format "%04x" parsed-int)))
+        (format "%04x" parsed-int)))))
+
+(defn pad-binary-zeros
+  [bin-in desired-length]
+  (str (reduce str (repeat (- desired-length (count bin-in)) "0")) bin-in))
+
+(defn hex-target-to-binary
+  "parses a hex string into a binary string of desired length"
+  [hex-in desired-length]
+  (pad-binary-zeros (Integer/toBinaryString (read-string hex-in)) 
+                    desired-length))
 
 (defn process-r-type
   "Processes an R-Type instruction"
@@ -122,22 +134,21 @@
         Rb (get registers (get instruction-map :arg2))
         Rc (get registers(get instruction-map :arg3))]
     (do
-     (println 
-      (str  (get instruction-map :op) " " 
-            (get instruction-map :arg1) " " 
-            (get instruction-map :arg2) " " 
-            (get instruction-map :arg3)))
+      ;; (println (str  (get instruction-map :op) " " 
+                     ;; (get instruction-map :arg1) " " 
+                     ;; (get instruction-map :arg2) " " 
+                     ;; (get instruction-map :arg3)))
 
-     (println (str "Opcode: " opcode 
-                   " Rb " Rb 
-                   " Rc " Rc 
-                   " Rd " Rd))
+     ;; (println (str "Opcode: " opcode 
+                   ;; " Rb " Rb 
+                   ;; " Rc " Rc 
+                   ;; " Rd " Rd))
 
-     (println 
-      (bin-str-to-hex (str opcode Rb Rc Rd "00000000000")))
+     ;; (println 
+      ;; (bin-str-to-hex (str opcode Rb Rc Rd "00000000000")))
 
      (spit file-out 
-           (bin-str-to-hex (str opcode Rb Rc Rd "00000000000"))
+           (str (bin-str-to-hex (str opcode Rb Rc Rd "00000000000")) "\n")
            :append true))))
 
 (defn process-i-type
@@ -149,49 +160,86 @@
         Imm (get instruction-map :arg3)]
     
     (do
-      (println 
-       (str  (get instruction-map :op) " " 
-             (get instruction-map :arg1) " " 
-             (get instruction-map :arg2) " " 
-             (get instruction-map :arg3)))
+      ;; (println 
+       ;; (str  (get instruction-map :op) " " 
+             ;; (get instruction-map :arg1) " " 
+             ;; (get instruction-map :arg2) " " 
+             ;; (get instruction-map :arg3)))
 
-      (println (str "Opcode: " opcode
-                    " Rb: " Rb 
-                    " Rd: " Rd
-                    " Imm: " Imm))
+      ;; (println (str "Opcode: " opcode
+                    ;; " Rb: " Rb 
+                    ;; " Rd: " Rd
+                    ;; " Imm: " Imm))
 
-      (println (str (bin-str-to-hex 
-                     (str opcode Rb Rd))
-                    (int-to-hex Imm)))
+      ;; (println (str (bin-str-to-hex 
+                     ;; (str opcode Rb Rd))
+                    ;; (int-to-hex Imm)))
 
-      (spit file-out 
-            (str (bin-str-to-hex opcode)
-                 (bin-str-to-hex Rb)
-                 (bin-str-to-hex Rd)
-                 (int-to-hex Imm))
+      (spit file-out
+            (str (bin-str-to-hex 
+                  (str opcode Rb Rd))
+                 (int-to-hex Imm) "\n")
             :append true))))
 
 (defn process-j-type
   "Processes an J-Type instructin"
   [instruction-map file-out]
-  (spit file-out
-        (str (get instruction-map :op) " is a J-Type instruction\n")
-        :append true))
+  (let [opcode (get opcodes (get instruction-map :op))
+        Target (get instruction-map :arg1)]
+
+    (do 
+      ;; (println 
+       ;; (str (get instruction-map :op) " "
+            ;; (get instruction-map :arg1)))
+
+      ;; (println (str "Opcode: " opcode
+                    ;; " Target " Target))
+
+      ;; (println (str (bin-str-to-hex (str opcode 
+                                         ;; (hex-target-to-binary Target 26)))))
+
+      (spit file-out
+            (str (bin-str-to-hex (str opcode 
+                                      (hex-target-to-binary Target 26))) "\n")
+            :append true))))
+
+(defn process-jr-type
+ "Process the special case of the jal instruction"
+ [instruction-map file-out]
+ (let [opcode (get opcodes (get instruction-map :op))
+       Rb (get registers (get instruction-map :arg2))]
+   (do
+     ;; (println 
+       ;; (str  (get instruction-map :op) " " 
+             ;; (get instruction-map :arg2)))
+
+     ;; (println (str "Opcode: " opcode 
+                   ;; " Rb " Rb))
+
+     ;; (println (bin-str-to-hex 
+                ;; (str opcode Rb "00000" "0000000000000000")))
+
+     (spit file-out 
+           (str (bin-str-to-hex (str opcode Rb "00000" "0000000000000000")) "\n")
+           :append true))))
 
 (defn -main
   "This is an assembler for cs-2200 project) 1"
   [file-in file-out]
   (with-open [rdr (io/reader file-in)]
-         (doseq [line (line-seq rdr)]
-           (let [inst-map 
-                 (zipmap [:op :arg1 :arg2 :arg3] 
-                         (map str/trim (str/split line #"[,;]")))]
-             (if-let [instruction-type (get inst-type (get inst-map :op))]
-               (do
-                 (if (= instruction-type "R-Type")
-                   (process-r-type inst-map file-out)
-                   (if (= instruction-type "I-Type")
-                     (process-i-type inst-map file-out)
-                     (if (= instruction-type "J-Type")
-                       (process-j-type inst-map file-out))))))))))
-
+    (do
+      (spit file-out "v2.0 raw\n" :append true)
+      (doseq [line (line-seq rdr)]
+        (let [inst-map 
+              (zipmap [:op :arg1 :arg2 :arg3] 
+                      (map str/trim (str/split line #"[,;]")))]
+          (if-let [instruction-type (get inst-type (get inst-map :op))]
+            (do
+              (if (= instruction-type "R-Type")
+                (process-r-type inst-map file-out)
+                (if (= instruction-type "I-Type")
+                  (process-i-type inst-map file-out)
+                  (if (= instruction-type "J-Type")
+                    (process-j-type inst-map file-out)
+                    (if (= instruction-type "JR-Type")
+                      (process-jr-type inst-map file-out))))))))))))
