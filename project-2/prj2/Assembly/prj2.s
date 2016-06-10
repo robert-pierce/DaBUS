@@ -115,30 +115,39 @@ factorial:      addi    $sp, $sp, -1         ! push RA
 
 
 !!! interrupt code
-                la      $a0, seconds          ! load seconds
-                lw      $a0, 0($a0)
+                la      $a0, seconds          ! load seconds label
+                lw      $a0, 0($a0)           ! get address of seconds in MEM
+                lw      $a1, 0($a0)           ! load MEM[seconds]
         
-                la      $a1, minutes          ! load minutes
-                lw      $a1, 0($a1)
-
-                la      $a2, hours            ! load hours
-                lw      $a2, 0($a2)
-
                 addi    $a3, $zero, 59        ! load 59 into $a3
 
-
-        
-                beq     $a0, $a3, inc_minutes  
-                addi    $a0, $a0, 1          ! inc_seconds
+                beq     $a1, $a3, inc_minutes !is seconds = 59?  
+                addi    $a1, $a1, 1          ! inc_seconds
+                sw      $a1, 0($a0)          ! store seconds in MEM
                 beq     $zero, $zero,  clean_up
 
-   inc_minutes: add     $a0, $zero, $zero    ! reset seconds to zero
-                beq     $a1, $a3,  inc_hours
+   inc_minutes: add     $a1, $zero, $zero    ! reset seconds to zero
+                sw      $a1, 0($a0)          ! store reset seconds in MEM
+
+                la      $a0, minutes         ! load minutes label
+                lw      $a0, 0($a0)          ! get address of minutes in MEM
+                lw      $a1, 0($a0)          ! load MEM[minutes]
+        
+                beq     $a1, $a3,  inc_hours ! is minutes = 59?
                 addi    $a1, $a1,  1         ! inc minutes
-                beq     $zero, $zero, clean_up
+                sw      $a1, 0($a0)          ! store minutes in MEM
+                beq     $zero, $zero, clean_up 
 
     inc_hours:  add     $a1, $zero, $zero    ! reset minutes
-                addi    $a2, $a2,  1         ! inc hours
+                sw      $a1, 0($a0)          ! store reset minutes in MEM
+
+                la      $a0, hours           ! load hours label
+                lw      $a0, 0($a0)          ! get address of hours in MEM
+                lw      $a1, 0($a0)          ! load hours
+        
+                addi    $a1, $a1,  1         ! inc hours
+
+                sw      $a1, 0($a0)          ! store hours in MEM
 
     clean_up:   lw      $at, 0($sp)          ! pop $at from the stack
                 addi    $sp, $sp, 1    
@@ -150,12 +159,12 @@ factorial:      addi    $sp, $sp, -1         ! push RA
                 addi    $sp, $sp, 1
                 lw      $a0, 0($sp)          ! pop $a0
                 addi    $sp, $sp, 1    
-                sw      $ra, 0($sp)          ! pop $ra
+                lw      $ra, 0($sp)          ! pop $ra
                 addi    $sp, $sp, 1
 
                 di                           ! disable interrupts
         
-                sw      $k0, 0($sp)          ! pop $k0
+                lw      $k0, 0($sp)          ! pop $k0
                 addi    $sp, $sp, 1
 
                 reti                         ! reurn from interrupt
