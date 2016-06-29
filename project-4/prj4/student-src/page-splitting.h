@@ -16,27 +16,15 @@
  * @param addr The virtual address.
  * @return     The virtual page number for this addres.
  */
-#define VADDR_PAGENUM(addr)\
-({int psize = page_size;\
-int off_bits = 0;\
-while ( (psize >> 1) > 0) {\
-off_bits = off_bits + 1;\
-psize = (psize >> 1);} \
-(addr >> off_bits);})
-   
+#define VADDR_PAGENUM(addr) (addr / page_size)
 
+   
 /*******************************************************************************
  * Get the offset for a particular address.
  * @param addr The virtual address.
  * @return     The offset into a page for the given virtual address.
  */
-#define VADDR_OFFSET(addr)\
-({int psize = page_size;\
-int off_bits = 0;\
-while ( (psize >> 1) > 0) {\
-off_bits = off_bits + 1;\
-psize = (psize >> 1);}\
-(((1 << off_bits) - 1) & addr);})
+#define VADDR_OFFSET(addr) (addr % page_size)
 
 
 #endif/*_STUDENT_PAGE_SPLITTING_H_*/

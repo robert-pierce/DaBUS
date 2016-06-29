@@ -22,6 +22,8 @@ pfn_t pagefault_handler(vpn_t request_vpn, int write) {
   pfn_t victim_pfn;
   vpn_t victim_vpn;
   pcb_t *victim_pcb;
+  pte_t *victim_pagetable;
+  pte_t *requesting_pte;
 
   /* Sanity Check */
   assert(current_pagetable != NULL);
@@ -42,32 +44,40 @@ pfn_t pagefault_handler(vpn_t request_vpn, int write) {
    * 2) Invalidate the page's entry in the victim's page table.
    * 3) Clear the victim page's TLB entry (hint: tlb_clearone()).
    */
-  //-------------------------- MY CODE ----------------------------//
-  pte_t *victim_pagetable = victim_pcb.pagetable;
-  if(victim_pagetable->dirty) {                  // if dirty, save to disk
-    page_to_disk(victim_pfn, victim_vpn, victim_pcb.pid);
-  }
   
-  victim_pagetable->valid = 0;                  //invalidate page entry
-  tlb_clearone(victim_vpn);                     // clear victim page from TLB
+
+ //-------------------------- MY CODE ----------------------------//
+  if(victim_pcb) {
+    victim_pagetable = victim_pcb->pagetable;
+    if(victim_pagetable[victim_vpn].dirty) {                  // if dirty, save to disk
+      page_to_disk(victim_pfn, victim_vpn, victim_pcb->pid);
+    }
+    
+    (victim_pagetable + victim_vpn)->valid = 0;                  //invalidate page entry
+    tlb_clearone(victim_vpn);                                 // clear victim page from TLB
+  }
   //------------------------------------------------------------------//
 
-  printf("****PAGE FAULT has occurred at VPN %u. Evicting (PFN %u VPN %u) as victim.\n", request_vpn,
+ 
+
+ printf("****PAGE FAULT has occurred at VPN %u. Evicting (PFN %u VPN %u) as victim.\n", request_vpn,
       victim_pfn, victim_vpn);
 
   /* Update the reverse lookup table so that 
      it knows about the requesting process  */
   //--------------- MY CODE ----------------------------------------//
-  rlt[victim.pfn].vpn = request_vpn;
-  rlt[victim.pfn].pcb = current;
+  rlt[victim_pfn].vpn = request_vpn;
+  rlt[victim_pfn].pcb = current;
   //---------------------------------------------------------------//
 
   /* Update the requesting process' page table */
   /* FIX ME */
   //--------------- MY CODE ---------------------------------------//
-  current_pagetable[request_vpn].pfn = victim_pfn;
-  current_pagetable[request_vpn].valid = 1;
-  current_pagetable[request_vpn=.dirty = 0;
+  requesting_pte = current_pagetable + request_vpn;
+
+  requesting_pte->pfn = victim_pfn;
+  requesting_pte->valid = 1;
+ // requesting_pte->dirty = 0;
   //---------------------------------------------------------------//
   
 

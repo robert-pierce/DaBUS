@@ -19,8 +19,12 @@ double compute_emat() {
     * of these computations have been done for you, in case you need them.
     */
 
-   /* long int total_accesses = count_writes + count_reads; */
-   /* long int tlb_misses     = total_accesses - count_tlbhits; */
+   long int total_accesses = count_writes + count_reads; 
+   long int tlb_misses     = total_accesses - count_tlbhits;
 
-   return 0;
+   long int tlbhits_time = count_tlbhits * MEMORY_ACCESS_TIME;  // tlbhit look up MEM[PFN]
+   long int tlbmisses_time = tlb_misses * 2 * MEMORY_ACCESS_TIME; // tlbmiss look up MEM[VPN] -> PFN then MEM[PFN]
+   long int pagefaults_time = count_pagefaults * MEMORY_ACCESS_TIME + DISK_ACCESS_TIME; // pagefault will check page table then fault to disk
+
+   return tlbhits_time + tlbmisses_time + pagefaults_time;
 }
