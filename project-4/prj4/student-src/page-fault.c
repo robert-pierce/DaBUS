@@ -77,7 +77,7 @@ pfn_t pagefault_handler(vpn_t request_vpn, int write) {
 
   requesting_pte->pfn = victim_pfn;
   requesting_pte->valid = 1;
- // requesting_pte->dirty = 0;
+  requesting_pte->dirty = 0;
   //---------------------------------------------------------------//
   
 

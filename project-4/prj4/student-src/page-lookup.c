@@ -16,9 +16,10 @@ pfn_t pagetable_lookup(vpn_t vpn, int write) {
    /*  Determine the PFN corresponding to the passed in VPN.
     * Perform the lookup using the current_pagetable.
     */
-   pte_t pte =  current_pagetable[vpn];
-   if (pte.valid) {
-     pfn = pte.pfn;                  // get physical frame number
+   pte_t *pte =  current_pagetable + vpn;
+   pte->used = 1;                  // mark virtual frame as used
+   if (pte->valid) {
+     pfn = pte->pfn;                  // get physical frame number
    }
    else {                            // page fault!
      count_pagefaults++;              
