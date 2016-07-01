@@ -49,12 +49,14 @@ pfn_t pagefault_handler(vpn_t request_vpn, int write) {
  //-------------------------- MY CODE ----------------------------//
   if(victim_pcb) {
     victim_pagetable = victim_pcb->pagetable;
-    if(victim_pagetable[victim_vpn].dirty) {                  // if dirty, save to disk
-      page_to_disk(victim_pfn, victim_vpn, victim_pcb->pid);
-    }
-    
-    (victim_pagetable + victim_vpn)->valid = 0;                  //invalidate page entry
-    tlb_clearone(victim_vpn);                                 // clear victim page from TLB
+    if(victim_pagetable[victim_vpn].valid) {
+      if(victim_pagetable[victim_vpn].dirty) {                  // if dirty, save to disk
+        page_to_disk(victim_pfn, victim_vpn, victim_pcb->pid);
+      }
+       
+      (victim_pagetable + victim_vpn)->valid = 0;                  //invalidate page entry
+      tlb_clearone(victim_vpn);                                    // clear victim page from TLB
+    }                                                           
   }
   //------------------------------------------------------------------//
 
