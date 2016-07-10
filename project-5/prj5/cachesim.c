@@ -30,26 +30,26 @@ void cache_init(uint64_t C, uint64_t S, uint64_t B) {
   cache->S = S;
   cache->associativity = 1 << S; // 2^S
   cache->lines = 1 << (C-B-S);   // 2^(C-B-S)
-  cache->sets = calloc(cache->associativity, sizeof(set_t));
-  cache->LRU = calloc(cache->lines, sizeof(LRU_head_t));
+  cache->sets = (set_t *) calloc(cache->associativity, sizeof(set_t));
+  cache->LRU = (LRU_head_t *) calloc(cache->lines, sizeof(LRU_head_t));
 
 
   /*Init Sets */
   for(i = 0; i < (cache->associativity); i++) {
     set = cache->sets + i;
     set->lines = 1 << (C-B-S); // 2^(C-B-S)
-    set->blocks = calloc(set->lines, sizeof(block_t));  // allocate the blocks in each set
+    set->blocks = (block_t *) calloc(set->lines, sizeof(block_t));  // allocate the blocks in each set
   }
 
   /*Init LRU*/
   for(i = 0; i < (cache->lines); i++){  // set up head sentinels for each LRU list (one per line)
     curr_LRU_head = cache->LRU + i;
-    curr_LRU_head->head = calloc(sizeof(LRU_node_t));  // init the first node in each list
+    curr_LRU_head->head = (LRU_node_t *) calloc(1, sizeof(LRU_node_t));  // init the first node in each list
     curr_LRU_node = curr_LRU_head->head;
     for(j = 0; j < (cache->associativity); j++) {   // create each node after the first in each LRU list
       curr_LRU_node->set_index = j;                      // init the LRU_node set_index
       if(j != cache->associativity - 1) {                // special case when at tail 
-        curr_LRU_node->next = calloc(sizeof(LRU_node_t)); // init the next member of the list
+        curr_LRU_node->next = (LRU_node_t *) calloc(1, sizeof(LRU_node_t)); // init the next member of the list
       curr_LRU_node = curr_LRU_node->next;              // walk to next node
       }  else {
         curr_LRU_node->next = NULL;                       // at the tail, set next to NULL
@@ -67,7 +67,15 @@ void cache_init(uint64_t C, uint64_t S, uint64_t B) {
 void cache_access (char rw, uint64_t address, struct cache_stats_t *stats) {
   block_t* curr_block;
   
-  stats->accesses++;                           // update stats
+  //-------update stats--------------------------------//
+  stats->accesses++;     
+  if (rw == WRITE) {             // a Write operation
+    stats->writes++;   
+  } else {                       // a Read operation
+    stats->reads++;             // update stats
+  }
+  //---------------------------------------------------//
+
   curr_block = block_search(address, cache);  // search the cache for a hit
 
   if(curr_block == NULL) {          
@@ -75,8 +83,6 @@ void cache_access (char rw, uint64_t address, struct cache_stats_t *stats) {
   } else {
     cache_hit(curr_block, rw, address, stats);  // cache hit!
   }
-
-
 }
 
 /**
@@ -84,6 +90,38 @@ void cache_access (char rw, uint64_t address, struct cache_stats_t *stats) {
  *
  */
 void cache_cleanup (struct cache_stats_t *stats, uint64_t S) {
+  LRU_head_t *curr_LRU_head;
+  LRU_node_t *curr_LRU_node, *temp_node;
+  set_t* curr_set;
+  block_t* curr_block;
+  int i;
+  //----- Clean up memory----------------------//
+  
+  // Cleanup LRU
+  for(i = 0; i < (cache->lines); i++) {   // walk through all the LRU_heads 
+    curr_LRU_head = cache->LRU + i;        // get the LRU head
+    curr_LRU_node = curr_LRU_head->head;  // get the head node of the LRU list for this line
+    while(curr_LRU_node->next != NULL) {  // walk the LRU list 
+      temp_node = curr_LRU_node;          
+      curr_LRU_node = temp_node->next;    // get next node
+      free(temp_node);                    // free the old node
+    }
+  }
+  free(cache->LRU);                       // free the LRU
+
+  // cleanup Sets
+  for(i = 0; i < (cache->associativity); i++) {   // walk through all of the set
+    curr_set = cache->sets +  i;                  // get the current set
+    free(curr_set->blocks);                       // free its blocks                             
+  }
+  free(cache->sets);                              // free the sets
+
+  free(cache);                             // free the cache
+  //---------------------------------------------------------//
+
+  //--------------- update stats-----------------------------//
+  stats->miss_rate = (stats->misses) / (stats->accesses);
+  stats->avg_access_time = (stats->access_time)+ 0.2*S + (stats->miss_rate)*(stats->miss_penalty); 
 
 }
 
@@ -94,14 +132,14 @@ void cache_cleanup (struct cache_stats_t *stats, uint64_t S) {
  * @param cache Pointer to the cache
  * @return Pointer to the matching block or NULL if cache miss
  */
-block_t* block_search(uint64_t address, cache_t *cache) {
+block_t * block_search(uint64_t address, cache_t *cache) {
   int i, j;
   set_t* curr_set;
   block_t* curr_block;
   int index = index_decode(address);
   int tag = tag_decode(address);
   
-  for(i = 0; i < (cache->associativity), i++) {      // iterate across all sets
+  for(i = 0; i < (cache->associativity); i++) {      // iterate across all sets
     curr_set = cache->sets + i;
     curr_block = curr_set->blocks + index;           // get the current block
     if(curr_block->valid && curr_block->tag == tag){ // cache hit!
@@ -153,37 +191,38 @@ int tag_decode(uint64_t address) {
  * @param address The memory address you are looking up
  * @param stats Pointer to the stats struct 
  */
-void cache_hit(block_t block, char rw, uint64_t address, struct cache_stats_t *stats) {
+void cache_hit(block_t *block, char rw, uint64_t address, struct cache_stats_t *stats) {
   if (rw == WRITE) {             // a Write operation
     block->dirty = 1;            // mark current block as dirty
-    stats->reads++;   
-  } else {                       // a Read operation
-    stats->writes++;             // update stats
-  }
-  
-  
+  } 
 }
 
 void cache_miss(char rw, uint64_t address, struct cache_stats_t *stats) {
   block_t* victim_block;
   
-  //--------- update stats -----------------------//
-  stats->misses++;
-  if (rw == WRITE) {             // a Write operation
-    stats->read_misses++;   
-  } else {                       // a Read operation
-    stats->write_misses++;       // update stats
-  }
-  //----------------------------------------------//
+  victim_block = find_invalid_block(address);    // search for an invalid block first
   
-  victim_block = find_invalid_block(address);
-  
-  if (victim_block == NULL) {                   // no invalid blocks, must evict LRU
+  if(victim_block == NULL) {                   // no invalid blocks, must evict LRU
     victim_block = find_LRU_block(address); 
   }
   
-  // IMPLEMENT   swap blocks, update valid
+  if(victim_block->dirty) {  // write back
+    stats->write_backs++;    // transfer to memory 
+  }
 
+  //----- reset victim_block -------------------------//
+  victim_block->dirty = 0;
+  victim_block->valid = 1;
+  victim_block->tag = tag_decode(address);   // set tag for new block 
+
+
+  //--------- update stats -----------------------//
+  stats->misses++;
+  if (rw == WRITE) {             // a Write operation
+    stats->write_misses++;   
+  } else {                       // a Read operation
+    stats->read_misses++;       // update stats
+  }
 }
 
 block_t* find_invalid_block(uint64_t address) {
@@ -197,7 +236,8 @@ block_t* find_invalid_block(uint64_t address) {
     curr_set = cache->sets + i;
     curr_block = curr_set->blocks + index;
     if(!curr_block->valid) {
-
+      
+      update_LRU(address, i); // update the LRU order
 
       return curr_block;      // found and invalid block
     }
@@ -216,7 +256,7 @@ block_t* find_LRU_block(uint64_t address) {
 
   set = cache->sets + set_index;             // get the set that holds the LRU victim
 
-  update_LRU(address, set_index);  // IMPLEMENT!!!
+  update_LRU(address, set_index);            // update the LRU order
 
   return set->blocks + index;                // return the correct block from the set
 }
@@ -225,7 +265,7 @@ void update_LRU(uint64_t address, int set_index) {
   LRU_head_t* LRU_list;
   LRU_node_t* curr_node;
   set_t* set;
-  int hit_fLAG =  0;
+  int hit_flag =  0;
   int index = index_decode(address);
   
   LRU_list = cache->LRU + index;             // get the right LRU for the line index

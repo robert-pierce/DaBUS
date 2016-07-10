@@ -21,7 +21,7 @@ typedef struct {
 
 typedef struct LRU_node_t {
     int set_index;
-    struct LRU_node_t* next;
+    struct  LRU_node_t* next;
 } LRU_node_t;
 
 typedef struct {
@@ -57,6 +57,16 @@ struct cache_stats_t {
 void cache_init(uint64_t C, uint64_t S, uint64_t B);
 void cache_access (char rw, uint64_t address, struct cache_stats_t *stats);
 void cache_cleanup (struct cache_stats_t *stats, uint64_t S);
+block_t * block_search(uint64_t address, cache_t *cache);
+int index_decode(uint64_t address);
+int tag_decode(uint64_t address);
+void cache_hit(block_t* block, char rw, uint64_t address, struct cache_stats_t *stats);
+void cache_miss(char rw, uint64_t address, struct cache_stats_t *stats);
+block_t* find_invalid_block(uint64_t address);
+block_t* find_LRU_block(uint64_t address);
+void update_LRU(uint64_t address, int set_index);
+
+
 
 static const uint64_t DEFAULT_C = 15;   /* 32KB Cache */
 static const uint64_t DEFAULT_B = 5;    /* 32-byte blocks */
