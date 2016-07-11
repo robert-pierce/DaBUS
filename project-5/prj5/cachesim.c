@@ -80,8 +80,10 @@ void cache_access (char rw, uint64_t address, struct cache_stats_t *stats) {
 
   if(curr_block == NULL) {          
     cache_miss(rw, address, stats); // cache miss :(
+     printf("clock:%" PRIu64 ", tag: %" PRIx64 ", index: %" PRIx64 ", %s, evicted block:%" PRId64 "\n",1, tag_decode(address), index_decode(address), "MISS" );
   } else {
     cache_hit(curr_block, rw, address, stats);  // cache hit!
+    printf("clock:%" PRIu64 ", tag: %" PRIx64 ", index: %" PRIx64 ", %s, evicted block:%" PRId64 "\n",1, tag_decode(address), index_decode(address), "HIT"  );
   }
 }
 
@@ -93,7 +95,6 @@ void cache_cleanup (struct cache_stats_t *stats, uint64_t S) {
   LRU_head_t *curr_LRU_head;
   LRU_node_t *curr_LRU_node, *temp_node;
   set_t* curr_set;
-  block_t* curr_block;
   int i;
   //----- Clean up memory----------------------//
   
@@ -120,7 +121,7 @@ void cache_cleanup (struct cache_stats_t *stats, uint64_t S) {
   //---------------------------------------------------------//
 
   //--------------- update stats-----------------------------//
-  stats->miss_rate = (stats->misses) / (stats->accesses);
+  stats->miss_rate = ((double) (stats->misses)) / ((double)(stats->accesses));
   stats->avg_access_time = (stats->access_time)+ 0.2*S + (stats->miss_rate)*(stats->miss_penalty); 
 
 }
@@ -133,18 +134,18 @@ void cache_cleanup (struct cache_stats_t *stats, uint64_t S) {
  * @return Pointer to the matching block or NULL if cache miss
  */
 block_t * block_search(uint64_t address, cache_t *cache) {
-  int i, j;
+  int i;
   set_t* curr_set;
   block_t* curr_block;
-  int index = index_decode(address);
-  int tag = tag_decode(address);
+  uint64_t index = index_decode(address);
+  uint64_t tag = tag_decode(address);
   
   for(i = 0; i < (cache->associativity); i++) {      // iterate across all sets
     curr_set = cache->sets + i;
     curr_block = curr_set->blocks + index;           // get the current block
     if(curr_block->valid && curr_block->tag == tag){ // cache hit!
       
-      update_LRU(address, i);                        // update the LRU
+      // update_LRU(address, i);                        // update the LRU
 
       return curr_block;
     }
@@ -159,7 +160,7 @@ block_t * block_search(uint64_t address, cache_t *cache) {
  * @param cache Pointer to the cache
  * @return The index (int)
  */
-int index_decode(uint64_t address) {
+uint64_t index_decode(uint64_t address) {
   int index_bits = (cache->C) - (cache->B) - (cache->S);
   int offset_bits = cache->B;
 
@@ -174,7 +175,7 @@ int index_decode(uint64_t address) {
  * @param cache Pointer to the cache
  * @return The tag (int)
  */
-int tag_decode(uint64_t address) {
+uint64_t tag_decode(uint64_t address) {
   int index_bits = (cache->C) - (cache->B) - (cache->S);
   int offset_bits = cache->B;
   int tag_bits = ADDRESS_LENGTH - index_bits - offset_bits;
@@ -229,7 +230,7 @@ block_t* find_invalid_block(uint64_t address) {
   int i;
   set_t* curr_set; 
   block_t* curr_block;
-  int index = index_decode(address);
+  uint64_t index = index_decode(address);
 
   // search for an invalid block first
   for(i = 0; i < (cache->associativity); i++) {
@@ -249,7 +250,7 @@ block_t* find_LRU_block(uint64_t address) {
   LRU_head_t* LRU_list;
   set_t* set;
   int set_index;
-  int index = index_decode(address);
+  uint64_t index = index_decode(address);
   
   LRU_list = cache->LRU + index;             // get the right LRU for the line index
   set_index = (LRU_list->head)->set_index;   // get the set_index from LRU head node
@@ -264,9 +265,8 @@ block_t* find_LRU_block(uint64_t address) {
 void update_LRU(uint64_t address, int set_index) {
   LRU_head_t* LRU_list;
   LRU_node_t* curr_node;
-  set_t* set;
-  int hit_flag =  0;
-  int index = index_decode(address);
+  int hit_flag = 0;
+  uint64_t index = index_decode(address);
   
   LRU_list = cache->LRU + index;             // get the right LRU for the line index
   curr_node = LRU_list->head;                // get the first LRU node for this list
@@ -282,4 +282,5 @@ void update_LRU(uint64_t address, int set_index) {
 
     curr_node = curr_node->next;             // walk to next node
   }
+  curr_node->set_index = set_index
 }

@@ -8,9 +8,9 @@
 #include <inttypes.h>
 
 typedef struct {
-    unsigned char valid;
-    unsigned char dirty;
-    int tag;
+    int valid;
+    int dirty;
+    uint64_t tag;
 } block_t;
 
 typedef struct {
@@ -58,8 +58,8 @@ void cache_init(uint64_t C, uint64_t S, uint64_t B);
 void cache_access (char rw, uint64_t address, struct cache_stats_t *stats);
 void cache_cleanup (struct cache_stats_t *stats, uint64_t S);
 block_t * block_search(uint64_t address, cache_t *cache);
-int index_decode(uint64_t address);
-int tag_decode(uint64_t address);
+uint64_t index_decode(uint64_t address);
+uint64_t tag_decode(uint64_t address);
 void cache_hit(block_t* block, char rw, uint64_t address, struct cache_stats_t *stats);
 void cache_miss(char rw, uint64_t address, struct cache_stats_t *stats);
 block_t* find_invalid_block(uint64_t address);
