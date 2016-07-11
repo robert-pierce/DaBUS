@@ -80,10 +80,10 @@ void cache_access (char rw, uint64_t address, struct cache_stats_t *stats) {
 
   if(curr_block == NULL) {          
     cache_miss(rw, address, stats); // cache miss :(
-     printf("clock:%" PRIu64 ", tag: %" PRIx64 ", index: %" PRIx64 ", %s, evicted block:%" PRId64 "\n",1, tag_decode(address), index_decode(address), "MISS" );
+    //  printf("clock:%" PRIu64 ", tag: %" PRIx64 ", index: %" PRIx64 ", %s, evicted block:%" PRId64 "\n",1, tag_decode(address), index_decode(address), "MISS" );
   } else {
     cache_hit(curr_block, rw, address, stats);  // cache hit!
-    printf("clock:%" PRIu64 ", tag: %" PRIx64 ", index: %" PRIx64 ", %s, evicted block:%" PRId64 "\n",1, tag_decode(address), index_decode(address), "HIT"  );
+    //printf("clock:%" PRIu64 ", tag: %" PRIx64 ", index: %" PRIx64 ", %s, evicted block:%" PRId64 "\n",1, tag_decode(address), index_decode(address), "HIT"  );
   }
 }
 
@@ -145,7 +145,7 @@ block_t * block_search(uint64_t address, cache_t *cache) {
     curr_block = curr_set->blocks + index;           // get the current block
     if(curr_block->valid && curr_block->tag == tag){ // cache hit!
       
-      // update_LRU(address, i);                        // update the LRU
+       update_LRU(address, i);                        // update the LRU
 
       return curr_block;
     }
@@ -282,5 +282,5 @@ void update_LRU(uint64_t address, int set_index) {
 
     curr_node = curr_node->next;             // walk to next node
   }
-  curr_node->set_index = set_index
+  curr_node->set_index = set_index;
 }
