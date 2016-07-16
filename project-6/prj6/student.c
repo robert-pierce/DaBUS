@@ -111,6 +111,7 @@ pcb_t* dequeue_ready() {
   Pthread_mutex_lock(&ready_queue_mutex);   // lock it down
   
   if( (ready_queue->count) == 0) {          // check if the queue is empty
+    Pthread_mutex_unlock(&ready_queue_mutex); // unlock
     return NULL;                            // if empty then return NULL, nothing to dequeue
   } else if ( (ready_queue->count) == 1) {  // check if there is only 1 block in ready queue
     temp = ready_queue->head;
@@ -149,7 +150,7 @@ static void schedule(unsigned int cpu_id)
   pcb_t *pcb;                            
   pcb = dequeue_ready();                    // dequeue from the ready queue
   
-  if (pcb != NULL) {                        // set the process' state to running, if it is not NULL
+  if(pcb != NULL) {                        // set the process' state to running, if it is not NULL
     pcb->state = PROCESS_RUNNING;
   }
 
