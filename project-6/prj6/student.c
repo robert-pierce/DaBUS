@@ -12,8 +12,34 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
-
+#include "student.h"
 #include "os-sim.h"
+
+/* Thread Wrappers */
+void Pthread_mutex_lock(pthread_mutex_t *mutex) {
+  int rc = pthread_mutex_lock(mutex);
+  assert(rc == 0);
+}
+
+void Pthread_mutex_unlock(pthread_mutex_t *mutex) {
+  int rc = pthread_mutex_unlock(mutex);
+  assert(rc == 0);
+}
+
+void Pthread_cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex) {
+  int rc = pthread_cond_wait(cond, mutex);
+  assert(rc == 0);
+}
+
+void Pthread_cond_signal(pthread_cond_t *cond) {
+  int rc = pthread_cond_signal(cond);
+  assert(rc == 0);
+}
+
+void Pthread_cond_broadcast(pthread_cond_t *cond) {
+  int rc = pthread_cond_broadcast(cond);
+  assert(rc == 0);
+}
 
 
 /*
@@ -27,6 +53,79 @@
  */
 static pcb_t **current;
 static pthread_mutex_t current_mutex;
+
+
+
+/* declare a ready queue and a mutex for the queue*/ 
+ready_queue_t *ready_queue;
+pthread_mutex_t  ready_queue_mutex;
+
+
+/* declare idle condition variable*/
+pthread_cond_t idle_cond = PTHREAD_COND_INITIALIZER;
+
+/* declare scheduling algorithm flags*/
+int round_robin_flag;
+int static_priority_flag;
+    
+/* declare time slice variable*/
+int time_slice;
+
+
+
+/* Init the ready queue */
+void init_ready_queue() {
+  ready_queue = (ready_queue_t*) malloc (sizeof(ready_queue_t));
+  ready_queue->count = 0;
+}
+
+/* ready_queue operations */
+
+/*
+ * Places a pcb in the ready queue
+ * @param pcb A pointer to the pcb being added to the ready queue
+ */
+void enqueue_ready(pcb_t *pcb) {
+  Pthread_mutex_lock(&ready_queue_mutex);    // lock it down
+  
+  if( (ready_queue->count) == 0) {           // check if queue is empty
+    ready_queue->head = pcb;                 // if empty then point head and tail to new block
+    ready_queue->tail = pcb;
+    Pthread_cond_broadcast(&idle_cond);         // signal that the ready queue is not empty
+  } else {              
+    ready_queue->tail->next = pcb;           // if not empty add new block to end of queue
+    ready_queue->tail = pcb;                 // point tail to this new block
+  }
+
+  ready_queue->count++;                      // increment the ready queue count
+
+  Pthread_mutex_unlock(&ready_queue_mutex);  // unlock
+} 
+
+/*
+ * Removes a block from the ready_queue
+ * @return a pointer to the removed pcb
+ */
+pcb_t* dequeue_ready() {
+  pcb_t* temp;
+  Pthread_mutex_lock(&ready_queue_mutex);   // lock it down
+  
+  if( (ready_queue->count) == 0) {          // check if the queue is empty
+    return NULL;                            // if empty then return NULL, nothing to dequeue
+  } else if ( (ready_queue->count) == 1) {  // check if there is only 1 block in ready queue
+    temp = ready_queue->head;
+    ready_queue->head = NULL;               // if only one block then set head and tail to NULL
+    ready_queue->tail = NULL;
+  } else {                                  // more than one block in queue
+    temp = ready_queue->head;         
+    ready_queue->head = temp->next;         // remove the head and set next pcb to head
+  } 
+  
+  ready_queue->count--;                     // decrement ready_queue count
+ 
+  Pthread_mutex_unlock(&ready_queue_mutex); // release the lock
+  return temp;                              // return the block
+}
 
 
 /*
@@ -47,7 +146,18 @@ static pthread_mutex_t current_mutex;
  */
 static void schedule(unsigned int cpu_id)
 {
-    /* FIX ME */
+  pcb_t *pcb;                            
+  pcb = dequeue_ready();                    // dequeue from the ready queue
+  
+  if (pcb != NULL) {                        // set the process' state to running, if it is not NULL
+    pcb->state = PROCESS_RUNNING;
+  }
+
+  Pthread_mutex_lock(&current_mutex);       // lock down the current[]
+  current[cpu_id] = pcb;
+  Pthread_mutex_unlock(&current_mutex);     // unlock
+
+  context_switch(cpu_id, pcb, time_slice);  // invoke the scheduler 
 }
 
 
@@ -60,10 +170,17 @@ static void schedule(unsigned int cpu_id)
  */
 extern void idle(unsigned int cpu_id)
 {
-    /* FIX ME */
-    schedule(0);
+  Pthread_mutex_lock(&ready_queue_mutex);   // lock down using the ready queue mutex
+  
+  while( (ready_queue->count)  == 0) {
+    Pthread_cond_wait(&idle_cond, &ready_queue_mutex);
+  }
+  
+  Pthread_mutex_unlock(&ready_queue_mutex);  // unlock
+  schedule(cpu_id);
+   
 
-    /*
+  /*
      * REMOVE THE LINE BELOW AFTER IMPLEMENTING IDLE()
      *
      * idle() must block when the ready queue is empty, or else the CPU threads
@@ -72,7 +189,8 @@ extern void idle(unsigned int cpu_id)
      * you implement a proper idle() function using a condition variable,
      * remove the call to mt_safe_usleep() below.
      */
-    mt_safe_usleep(1000000);
+  //***************REMOVED**************************//
+ 
 }
 
 
@@ -98,7 +216,17 @@ extern void preempt(unsigned int cpu_id)
  */
 extern void yield(unsigned int cpu_id)
 {
-    /* FIX ME */
+  pcb_t *pcb;
+
+  Pthread_mutex_lock(&current_mutex);      // lock it down
+  
+  // get the currently running process on the cpu in quesition
+  pcb = current[cpu_id];
+  pcb->state = PROCESS_WAITING;           // update the process state to waiting
+ 
+  Pthread_mutex_unlock(&current_mutex);   // unlock
+
+  schedule(cpu_id);                       // invoke the scheduler  
 }
 
 
@@ -109,7 +237,17 @@ extern void yield(unsigned int cpu_id)
  */
 extern void terminate(unsigned int cpu_id)
 {
-    /* FIX ME */
+  pcb_t *pcb;
+  
+  Pthread_mutex_lock(&current_mutex);          // lock it down
+
+  // get the currently running process in the CPU in question
+  pcb = current[cpu_id];                        
+  pcb->state = PROCESS_TERMINATED;             // update the process state to terminated
+
+  Pthread_mutex_unlock(&current_mutex);        // unlock
+
+  schedule(cpu_id);                            // invoke the scheduler
 }
 
 
@@ -130,7 +268,8 @@ extern void terminate(unsigned int cpu_id)
  */
 extern void wake_up(pcb_t *process)
 {
-    /* FIX ME */
+  process->state = PROCESS_READY;
+  enqueue_ready(process);
 }
 
 
@@ -141,11 +280,14 @@ extern void wake_up(pcb_t *process)
 int main(int argc, char *argv[])
 {
     int cpu_count;
+    round_robin_flag = 0;
+    static_priority_flag = 0;
+    time_slice = -1;
 
     /* Parse command-line arguments */
     if (argc != 2)
     {
-        fprintf(stderr, "CS 2200 Project 4 -- Multithreaded OS Simulator\n"
+        fprintf(stderr, "CS 2200 Project 6 -- Multithreaded OS Simulator\n"
             "Usage: ./os-sim <# CPUs> [ -r <time slice> | -p ]\n"
             "    Default : FIFO Scheduler\n"
             "         -r : Round-Robin Scheduler\n"
@@ -160,6 +302,10 @@ int main(int argc, char *argv[])
     current = malloc(sizeof(pcb_t*) * cpu_count);
     assert(current != NULL);
     pthread_mutex_init(&current_mutex, NULL);
+
+    /* Init the ready queue and its mutex*/
+     init_ready_queue();
+     pthread_mutex_init(&ready_queue_mutex, NULL);
 
     /* Start the simulator in the library */
     start_simulator(cpu_count);
