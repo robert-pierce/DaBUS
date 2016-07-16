@@ -1,5 +1,5 @@
 SUBMIT = cachesim.h cachesim.c cachesim_driver.c Makefile
-CXXFLAGS := -g -Wall -std=c99 -lm
+CXXFLAGS = -g -Wall -std=c99 -lm
 CXX=gcc
 
 all: cachesim
