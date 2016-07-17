@@ -12,6 +12,7 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "student.h"
 #include "os-sim.h"
 
@@ -280,13 +281,13 @@ extern void wake_up(pcb_t *process)
  */
 int main(int argc, char *argv[])
 {
-    int cpu_count;
+  int cpu_count, i;
     round_robin_flag = 0;
     static_priority_flag = 0;
     time_slice = -1;
-
+    
     /* Parse command-line arguments */
-    if (argc != 2)
+    if (argc < 2 || argc > 5)
     {
         fprintf(stderr, "CS 2200 Project 6 -- Multithreaded OS Simulator\n"
             "Usage: ./os-sim <# CPUs> [ -r <time slice> | -p ]\n"
@@ -298,6 +299,16 @@ int main(int argc, char *argv[])
     cpu_count = atoi(argv[1]);
 
     /* FIX ME - Add support for -r and -p parameters*/
+    for(i = 0; i < argc; i++) {
+      if(strcmp(argv[i], "-r") == 0) {
+        round_robin_flag = 1;
+        time_slice = atoi(argv[i + 1]);
+      }
+      
+      if(strcmp(argv[i], "-p") == 0) {
+        static_priority_flag = 1;
+      }
+    }
 
     /* Allocate the current[] array and its mutex */
     current = malloc(sizeof(pcb_t*) * cpu_count);

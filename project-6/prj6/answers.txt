@@ -6,7 +6,15 @@ GT Number: 901554418
 Problem 1B
 ----------
 
-/* Fix me */
+        CPUs    Execution Time
+         1             67.6 s
+         2             35.8 s
+         3             33.5 s
+         4             33.4 s
+
+The execution time decreases exponentially as the number of CPUs increases from one all the way to four. When we
+ran the experiment with 4 CPUs we noticed most of the CPUs were in the IDLE state. We then ran the experiement
+with three CPUs and compared these results to the case of two CPUs. The time decreased by a very small amount when moving from two to three CPUS when compared to moving from one to two. Also during experiment with three CPUs, we start to see IDLE CPUs. These results tell us that given a FIFO (non-preemptive) scheduler the degree of concurrency and the I/O characteristics in the simulator are such that only two CPUs are needed to efficiently speed up the execution time. When more CPUs are added, more and more of their state is spend in IDLE.  
 
 Problem 2B
 ----------
