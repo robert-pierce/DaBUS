@@ -26,7 +26,7 @@ void Pthread_cond_broadcase(pthread_cond_t *cond);
 void init_ready_queue();
 void enqueue_ready(pcb_t *pcb);
 pcb_t* dequeue_ready();
-
+pcb_t* dequeue_priority_ready();
 
 typedef struct {
   pcb_t *head;

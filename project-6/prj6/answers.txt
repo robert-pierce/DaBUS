@@ -43,5 +43,24 @@ work in a time slice.
 Problem 3B
 ----------
 
-/* Fix me */
+./os-sim 1
+     context_switches     execution_time       time_in_ready_state
+            99                 67.6 s                 389.9 s
 
+./os-sim 1 -r 2
+     context_switches     execution_time       time_in_ready_state
+           262                 67.5 s                  285.2 s
+
+./os-sim -p
+     context_switches     execution_time       time_in_ready_state
+           158                 67.6 s                  271.7 s
+
+
+The shortest job first (SJF) scheduling algorithm is just a special case of a priority algorithm. In SJF the priority is based
+on the predicted execution time with processes with longer execution times being given lower priorities. Given this we believe 
+the static priority alogrithm is closest to the SJF algorithm. In the static priority algorith each process has a priority assigned
+to it and that priority does not change. For this simulator the priorities were given to us, so we do not know where the priorities 
+came from. However, it is at least possible that these priorities came from the execution times meausured at some other time before
+being given to us. This means it could be the case that the static priority alogorithm could be very similar to the SJF algorithm. 
+As you can see by the results of our experiment, the the static priority algorithm has the shortest waiting time (time_in_ready_state)
+of the other two scheduling algorithms we tested in this simulation.

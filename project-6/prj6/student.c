@@ -104,7 +104,7 @@ void enqueue_ready(pcb_t *pcb) {
 } 
 
 /*
- * Removes a block from the ready_queue
+ * Removes the process from the head of the ready_queue
  * @return a pointer to the removed pcb
  */
 pcb_t* dequeue_ready() {
@@ -128,6 +128,77 @@ pcb_t* dequeue_ready() {
   Pthread_mutex_unlock(&ready_queue_mutex); // release the lock
   return temp;                              // return the block
 }
+
+/*
+ * Removes the highest priority process from the ready_queue
+ * @return a pointer to the removed pcb
+ */
+pcb_t* dequeue_priority_ready() {
+  pcb_t* temp; 
+  pcb_t* highest_priority;
+  Pthread_mutex_lock(&ready_queue_mutex);
+
+  // check for special states of the ready_queue
+  if( (ready_queue->count) == 0) {              // check if ready_queue is empty
+    Pthread_mutex_unlock(&ready_queue_mutex);  // if so then unlock ready_queue
+    return NULL;                               // and return NULL pointer
+ 
+  } else if( (ready_queue->count) == 1) {  // check if ready_queue has only one process
+    temp = ready_queue->head;              // if so detach  head
+    ready_queue->head = NULL;              // then set head and tail to NULL
+    ready_queue->tail = NULL;          
+
+    ready_queue->count--;                     // decrement count to zero
+    Pthread_mutex_unlock(&ready_queue_mutex); // unlock ready_queue
+    return temp;
+  
+    // if the ready_queue has more than two processes, search for highest priority
+  } else {
+    temp = ready_queue->head;   // temp is the current process as we walk to list
+    highest_priority = temp;    // set the highest priority to the head
+    while(temp != NULL) {       // walk the list
+      // if the current process has a higher priority then one we have seen already
+      if(temp->static_priority > highest_priority->static_priority) {
+        highest_priority = temp;  // then set highest_priority to the current process
+      }
+      temp = temp->next;         // move to the next node
+    }
+
+    // now  we have a pointer to the highest priority process in the ready queue
+    // time to remove it
+
+    // check if the highest priority is the head
+    if(highest_priority == ready_queue->head) {
+      ready_queue->head = (ready_queue->head)->next; //if so set head to the next node
+
+      // check if the highest priority is the tail
+    } else if(highest_priority == ready_queue->tail) {
+      // if so walk the list to find the node preceding highest priority node
+      temp = ready_queue->head;    
+      while(temp->next != highest_priority) {  // walk the list
+        temp = temp->next;
+      }
+      ready_queue->tail = temp; // remove the old tail (higest priority in this case)
+      temp->next = NULL;        // remove old tail
+    
+      // if highest priority is not head or tail then remove internal node
+    } else {
+      temp = ready_queue->head;  
+      // walk the list looking for node preceding highest priority node
+      while(temp->next != highest_priority) {  
+        temp = temp->next;
+      }
+      temp->next = highest_priority->next;  // remove the highest priority
+    }
+    
+    ready_queue->count--;                          // decrement queue count
+    Pthread_mutex_unlock(&ready_queue_mutex);     // unlock ready_queue
+    return highest_priority;                      // return the highest priority
+  }
+  return NULL;
+}
+
+
 
 
 /*
