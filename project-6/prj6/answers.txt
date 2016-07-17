@@ -14,12 +14,31 @@ Problem 1B
 
 The execution time decreases exponentially as the number of CPUs increases from one all the way to four. When we
 ran the experiment with 4 CPUs we noticed most of the CPUs were in the IDLE state. We then ran the experiement
-with three CPUs and compared these results to the case of two CPUs. The time decreased by a very small amount when moving from two to three CPUS when compared to moving from one to two. Also during experiment with three CPUs, we start to see IDLE CPUs. These results tell us that given a FIFO (non-preemptive) scheduler the degree of concurrency and the I/O characteristics in the simulator are such that only two CPUs are needed to efficiently speed up the execution time. When more CPUs are added, more and more of their state is spend in IDLE.  
+with three CPUs and compared these results to the case of two CPUs. The time decreased by a very small amount 
+when moving from two to three CPUS when compared to moving from one to two. Also during the experiment with three
+CPUs is when  we first start to see IDLE CPUs. These results tell us that given a FIFO (non-preemptive) scheduler 
+the degree of concurrency and the I/O characteristics in the simulator  are such that only two CPUs are needed to 
+efficiently speed up the execution time. When more CPUs are added, more and more of their state is spend in IDLE.  
 
 Problem 2B
 ----------
+time_slice      context_switches     execution_time       time_in_ready_state
+  800 ms               136                 67.6 s               325.4 s
+  600 ms               161                 67.6 s               314.5 s
+  400 ms               203                 67.6 s               298.8 s              
+  200 ms               362                 67.5 s               285.2 s
 
-/* Fix me */
+We can see that the total waiting time (time_in_ready_state) does decrease in a roughly linear way as the time slice 
+decreases. We also see the total number of context switches increases as the time slice decreases also. This is expected 
+since the shorter the time slice the more times the cpu will be switching from process to process. Also, shorter time
+slices mean less time a process has to wait in the ready queue before being scheduled. This may make it seem that shorter
+time slices are always better.
+
+In a real cpu the shortest time slice may not be the best option because more and more of the
+time devoted to each process is consumed with the overhead of a context switch. This is called thrashing and is not good. 
+By the time the overhead work of the context switch is complete the time slice may be about to expire. When it does expire
+then more time must be devoted to context switching to the new process. This scenario leaves no to little time for actual 
+work in a time slice.
 
 Problem 3B
 ----------

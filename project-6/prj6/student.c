@@ -159,7 +159,7 @@ static void schedule(unsigned int cpu_id)
   current[cpu_id] = pcb;
   Pthread_mutex_unlock(&current_mutex);     // unlock
 
-  context_switch(cpu_id, pcb, time_slice);  // invoke the scheduler 
+  context_switch(cpu_id, pcb, time_slice);  // switch processes 
 }
 
 
@@ -205,7 +205,15 @@ extern void idle(unsigned int cpu_id)
  */
 extern void preempt(unsigned int cpu_id)
 {
-    /* FIX ME */
+  pcb_t *pcb;
+
+  Pthread_mutex_lock(&current_mutex);             // lock current[] down
+  pcb =  current[cpu_id];                         // get the process running on this cpu
+  pcb->state = PROCESS_READY;                     // change its state from RUNNING to READY
+  enqueue_ready(pcb);                             // put it in the ready queue
+  Pthread_mutex_unlock(&current_mutex);           // unlock current[]
+
+  schedule(cpu_id);                               // invoke the scheduler
 }
 
 
