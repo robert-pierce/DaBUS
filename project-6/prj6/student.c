@@ -69,8 +69,8 @@ pthread_cond_t idle_cond = PTHREAD_COND_INITIALIZER;
 int round_robin_flag;
 int static_priority_flag;
     
-/* declare time slice variable*/
-int time_slice;
+/* declare time slice and cpu_count variable*/
+int time_slice, cpu_count;
 
 
 
@@ -278,8 +278,43 @@ extern void terminate(unsigned int cpu_id)
  */
 extern void wake_up(pcb_t *process)
 {
-  process->state = PROCESS_READY;
-  enqueue_ready(process);
+  int i, priority, lowest_priority, lowest_index;
+  pcb_t *running_process;
+  
+  process->state = PROCESS_READY;           // set the processes state to ready
+  enqueue_ready(process);                   // put the process in the ready queue     
+
+  // if we are in static priority mode
+  if(static_priority_flag) {               
+    lowest_priority = 10;                  // init some variables
+    lowest_index = -1;
+    priority = process->static_priority;   // get the priority of the woken up process
+
+    Pthread_mutex_lock(&current_mutex);    // lock current[] down
+
+    for(i = 0; i < cpu_count; i++){        // iterate through the CPUs
+      running_process = current[i];        // get the process running on CPU i
+      if(running_process != NULL) {        // check if CPU is idle
+        
+        // if the CPU is not idle then search for the lowest priority process running
+        if (running_process->static_priority < lowest_priority) { 
+          lowest_priority = running_process->static_priority; // save the lowest 
+          lowest_index = i;                                   // save the lowest index
+        }
+      } else {                       // we found an idle CPU, return
+        Pthread_mutex_unlock(&current_mutex);  // unlock current[]
+        return;
+      }
+    }
+    
+    Pthread_mutex_unlock(&current_mutex);  // unlock current[]
+
+
+   // check if the woken up process' priority is greater then the lowest running process
+    if(lowest_priority < priority && lowest_index > -1) { 
+      force_preempt(lowest_index);    // if lower priority, preempt the running process
+    }
+  }
 }
 
 
@@ -289,7 +324,7 @@ extern void wake_up(pcb_t *process)
  */
 int main(int argc, char *argv[])
 {
-  int cpu_count, i;
+  int i;
     round_robin_flag = 0;
     static_priority_flag = 0;
     time_slice = -1;
