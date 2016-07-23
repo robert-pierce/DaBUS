@@ -35,5 +35,8 @@ CONN_INFO* setup_socket(char* ip, char* port);
 int rtp_send_message(CONN_INFO *connection, MESSAGE*msg);
 MESSAGE* rtp_receive_message(CONN_INFO *connection); 
 void shutdown_socket(CONN_INFO *connection);
+char* resize_buffer(char *buffer, int *buff_capacity);
+PACKET* build_ACK();
+PACKET* build_NACK();
 
 #endif
