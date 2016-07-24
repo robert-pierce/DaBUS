@@ -171,7 +171,7 @@ int rtp_send_message(CONN_INFO *connection, MESSAGE *msg){
 MESSAGE* rtp_receive_message(CONN_INFO *connection){
   MESSAGE *msg = (MESSAGE*) calloc(1, sizeof(MESSAGE));
   PACKET *packet = (PACKET*) calloc(1, sizeof(PACKET));
-  int i, buff_capacity, curr_checksum, msg_received;
+  int i, buff_capacity, curr_checksum, msg_received, packet_failed;
 
   // init message
   msg->buffer = (char*) calloc(MAX_PAYLOAD_LENGTH, sizeof(char));
@@ -180,6 +180,7 @@ MESSAGE* rtp_receive_message(CONN_INFO *connection){
 
   
   do {
+    packet_failed = 0;
     msg_received = recvfrom(connection->socket, packet, sizeof(PACKET), 0, NULL, 0);  // get the packet
 
     if (msg_received != -1) { // check if a message was received
@@ -205,7 +206,7 @@ MESSAGE* rtp_receive_message(CONN_INFO *connection){
             msg->length++; // now we increment msg->length
           }
         
-          // after reading and copying  packet send ACK
+          // after reading and copying packet send ACK
           sendto(connection->socket, build_ACK(), sizeof(PACKET), 0,
                  connection->remote_addr, connection->addrlen);
         } else {
@@ -213,10 +214,12 @@ MESSAGE* rtp_receive_message(CONN_INFO *connection){
           // if checksum does not match send NACK
           sendto(connection->socket, build_NACK(), sizeof(PACKET), 0, 
                connection->remote_addr, connection->addrlen);
+
+          packet_failed = 1;
         }
       }
     }  
-  } while(msg_received == -1 || packet->type != LAST_DATA);
+  } while(msg_received == -1 || packet_failed || packet->type != LAST_DATA);
 
 
 	/* ---- FIXME ----
@@ -262,21 +265,27 @@ char* resize_buffer(char *buffer, int *buff_capacity) {
 
 
 PACKET* build_ACK() {
-  PACKET *ack = (PACKET*) calloc(1, sizeof(PACKET));
-  
-  ack->type = ACK;
-  ack->checksum = 0;
-  ack->payload_length = 0;
-
+  PACKET *ack;
+  do {
+    ack = (PACKET*) calloc(1, sizeof(PACKET));
+    if(ack) {
+      ack->type = ACK;
+      ack->checksum = 0;
+      ack->payload_length = 0;
+    }
+  } while(!ack);
   return ack;
 }
 
 PACKET* build_NACK() {
-  PACKET *nack = (PACKET*) calloc(1, sizeof(PACKET));
-  
-  nack->type = NACK;
-  nack->checksum = 0;
-  nack->payload_length = 0;
-
+  PACKET *nack;
+  do {
+    nack = (PACKET*) calloc(1, sizeof(PACKET));
+    if(nack) {
+      nack->type = NACK;
+      nack->checksum = 0;
+      nack->payload_length = 0;
+    }
+  } while(!nack);
   return nack;
 }
