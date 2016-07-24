@@ -61,7 +61,7 @@ void shutdown_socket(CONN_INFO *connection){
 /*
  *  Returns a number computed based on the data in the buffer.
  */
-static int checksum(char *buffer, int length){
+static int checksum(char *buffer, int length) {
   int i, tally = 0;
 
   for(i = 0; i < length; i++) {
@@ -132,13 +132,36 @@ static PACKET* packetize(char *buffer, int length, int *count){
  * Send a message via RTP using the connection information
  * given on UDP socket functions sendto() and recvfrom()
  */
-int rtp_send_message(CONN_INFO *connection, MESSAGE*msg){
-	/* ---- FIXME ----
-	 * The goal of this function is to turn the message buffer
-	 * into packets and then, using stop-n-wait RTP protocol,
-	 * send the packets and re-send if the response is a NACK.
-	 * If the response is an ACK, then you may send the next one
-	 */
+int rtp_send_message(CONN_INFO *connection, MESSAGE *msg){
+  int i, msg_received, packet_count = 0;
+  PACKET *packet_arr; 
+  PACKET *response = (PACKET*) calloc(1, sizeof(PACKET));
+
+  // divide message into packets
+  packet_arr = packetize(msg->buffer, msg->length, &packet_count); 
+
+  // send all of the packets
+  for(i = 0; i < packet_count; i++) { 
+    do { 
+      sendto(connection->socket, packet_arr + i , sizeof(PACKET), 0,
+             connection->remote_addr, connection->addrlen);               // send the packet
+     
+      // receive response
+      do {
+        msg_received = recvfrom(connection->socket, response, 
+                                sizeof(PACKET), 0, NULL, 0);             // get the response
+      } while (msg_received == -1);                     // spin while waiting for a response
+    } while(response->type == NACK);                    // if response is a NACK then resend and repeat
+  }
+
+  /* ---- FIXME ----
+   * The goal of this function is to turn the message buffer
+   * into packets and then, using stop-n-wait RTP protocol,
+   * send the packets and re-send if the response is a NACK.
+   * If the response is an ACK, then you may send the next one
+   */
+
+  return 0;
 }
 
 /*
@@ -146,37 +169,54 @@ int rtp_send_message(CONN_INFO *connection, MESSAGE*msg){
  * given on UDP socket functions sendto() and recvfrom()
  */
 MESSAGE* rtp_receive_message(CONN_INFO *connection){
-  MESSAGE *msg = calloc(1, sizeof(MESSAGE));
-  PACKET *packet =(PACKET*) calloc(1, sizeof(PACKET));
-  int i, buff_capacity, curr_checksum;
+  MESSAGE *msg = (MESSAGE*) calloc(1, sizeof(MESSAGE));
+  PACKET *packet = (PACKET*) calloc(1, sizeof(PACKET));
+  int i, buff_capacity, curr_checksum, msg_received;
 
+  // init message
   msg->buffer = (char*) calloc(MAX_PAYLOAD_LENGTH, sizeof(char));
   msg->length = 0;
   buff_capacity = MAX_PAYLOAD_LENGTH;
 
+  
   do {
-    recvfrom(connection->socket, packet, sizeof(PACKET), 0, NULL, 0);
+    msg_received = recvfrom(connection->socket, packet, sizeof(PACKET), 0, NULL, 0);  // get the packet
 
-    if(packet->type == DATA) {
-      curr_checksum = checksum(packet->payload, packet->payload_length);
+    if (msg_received != -1) { // check if a message was received
+    // check if packet is a DATA type
+      if(packet->type == DATA || packet->type == LAST_DATA) {
+        curr_checksum = checksum(packet->payload, packet->payload_length); // calc checksum
     
-      if( packet->checksum == curr_checksum) {
-        for(i = 0; i < packet->payload_length; i++) {
-          if(msg->length == buff_capacity) {
-            msg->buffer = resize_buffer(msg->buffer, &buff_capacity);
-          }
+        // check if checksum matches packet
+        if( packet->checksum == curr_checksum) {
           
-          msg->buffer[msg->length] = packet->payload[i];
-          msg->length++;
+          // if checksum matches, copy message from packet
+          for(i = 0; i < packet->payload_length; i++) {
+          
+            // before copying a char from packet to message
+            // check if the message buffer needs to be resized 
+            if(msg->length == buff_capacity) {
+              msg->buffer = resize_buffer(msg->buffer, &buff_capacity);
+            }
+          
+            // note: we haven't incremented msg->length yet, so it is one behind
+            // i.e. on packet the first char to write msg->length is 0 here
+            msg->buffer[msg->length] = packet->payload[i];
+            msg->length++; // now we increment msg->length
+          }
+        
+          // after reading and copying  packet send ACK
+          sendto(connection->socket, build_ACK(), sizeof(PACKET), 0,
+                 connection->remote_addr, connection->addrlen);
+        } else {
+          
+          // if checksum does not match send NACK
+          sendto(connection->socket, build_NACK(), sizeof(PACKET), 0, 
+               connection->remote_addr, connection->addrlen);
         }
-        // SEND ACK
-        sendto(connection->socket, build_ACK(), sizeof(PACKET), 0, connection->remote_addr, connection->addrlen);
-      } else {
-        // SEND NACK
-        sendto(connection->socket, build_NACK(), sizeof(PACKET), 0, connection->remote_addr, connection->addrlen);
       }
-    }
-  } while(packet->type != LAST_DATA);
+    }  
+  } while(msg_received == -1 || packet->type != LAST_DATA);
 
 
 	/* ---- FIXME ----
@@ -202,7 +242,9 @@ MESSAGE* rtp_receive_message(CONN_INFO *connection){
  */
 char* resize_buffer(char *buffer, int *buff_capacity) {
   int i;
-  char *new_buffer = (char*) calloc(2*(*buff_capacity), sizeof(char));
+  
+  // double the size of the old buffer
+  char *new_buffer = (char*) calloc(2*(*buff_capacity), sizeof(char)); 
   
   // copy contents of old buffer to new buffer
   for(i = 0; i < *buff_capacity; i++) {
@@ -212,7 +254,7 @@ char* resize_buffer(char *buffer, int *buff_capacity) {
   // free the old buffer
   free(buffer); 
   
-  // increase the capacity 
+  // increase the capacity variable
   *buff_capacity = 2*(*buff_capacity);
 
   return new_buffer;
